@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -9,30 +6,42 @@ import (
 	"log"
 
 	"github.com/karthiknayak6/snipe/database"
+	"github.com/karthiknayak6/snipe/helpers"
 	"github.com/spf13/cobra"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// listCmd represents the list command
+
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all snippets",
 	Long: `List all snippets from the 'snippets' collection.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		filter := bson.M{}
+		if len(args) != 0 {
+			cmd.Help()
+			return
+		}
+		lan, _ := cmd.Flags().GetString("lan")
+		head, _ := cmd.Flags().GetBool("head")
+
+		filter := bson.M{}	
+		if lan != "" {
+			filter = bson.M{"lan": lan}
+		} 
 		cur, err := database.Db.Collection("snippets").Find(context.TODO(), filter)
 		if err != nil {
 			log.Panic(err)
 		}
 		defer cur.Close(context.TODO())
 
-		var snippets []Snippet // Assuming Snippet is your struct to represent a snippet
+		var snippets []Snippet 
 
 		for cur.Next(context.TODO()) {
 			var snippet Snippet
 			err := cur.Decode(&snippet)
 			if err != nil {
-				log.Panic(err)
+				fmt.Println("Error: ", err)
+				return 
 			}
 			snippets = append(snippets, snippet)
 		}
@@ -42,7 +51,27 @@ var listCmd = &cobra.Command{
 		}
 
 		for _, snippet := range snippets {
-			fmt.Printf("ID: %v\nLan: %s\nTitle: %s\n\n", snippet.ID	, snippet.Lan, snippet.Title)
+			fmt.Printf("%v | %s | %s\n\n", snippet.ID, snippet.Lan, snippet.Title)
+			if head {
+				if len(snippet.Code) < 350 {
+					highlightedCode, err := helpers.HighlightSyntax(snippet.Lan, snippet.Code)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					fmt.Println(highlightedCode, ".......")
+				} else {
+
+					highlightedCode, err := helpers.HighlightSyntax(snippet.Lan, snippet.Code[:350])
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					fmt.Println(highlightedCode, ".......")
+					fmt.Println(	)
+				}
+			}
+
 		}
 	},
 }
@@ -51,13 +80,6 @@ var listCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(listCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// listCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// listCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	listCmd.Flags().StringP("lan", "l", "", "Filter snippets by language")
+	listCmd.Flags().BoolP("head", "y", false, "Display first few characters of code snippet")
 }

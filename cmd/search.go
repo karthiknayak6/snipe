@@ -1,40 +1,119 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"strconv"
 
+	"github.com/karthiknayak6/snipe/database"
+	"github.com/karthiknayak6/snipe/helpers"
 	"github.com/spf13/cobra"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-// searchCmd represents the search command
+
 var searchCmd = &cobra.Command{
 	Use:   "search",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "search for snippets",
+	Long: `search for snippets using ID or substring`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("search called")
+		lan, _ := cmd.Flags().GetString("lan")
+		head, _ := cmd.Flags().GetBool("head")
+		if len(args) != 1 {
+				cmd.Help()
+				return
+		}
+		
+		search_string := args[0]
+		search_id, err := strconv.Atoi(search_string)
+		var cur *mongo.Cursor
+		
+		if err != nil {
+			//handle title
+			filter := bson.M{"title": bson.M{"$regex": search_string, "$options": "i"}}
+			if lan != "" {
+				filter = bson.M{"title": search_string, "lan": lan}	
+			}
+			cur, err = database.Db.Collection("snippets").Find(context.TODO(), filter)
+		} else {
+			//handle ID
+			filter := bson.M{"_id":search_id }		
+			if lan != "" {
+				filter = bson.M{"_id": search_string, "lan": lan}	
+			}
+			cur, err = database.Db.Collection("snippets").Find(context.TODO(), filter)
+		}
+		if err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+		defer cur.Close(context.TODO())
+
+		var snippets []Snippet
+
+		for cur.Next(context.TODO()) {
+			var snippet Snippet
+			err := cur.Decode(&snippet)
+			if err != nil {
+				fmt.Println("Error: ", err)
+				return
+			}
+			snippets = append(snippets, snippet)
+		}
+
+		if err := cur.Err(); err != nil {
+			fmt.Println("Error: ", err)
+			return
+		}
+		if len(snippets) == 0 {
+			fmt.Println("No snippets found")
+			return
+		}
+		if search_id != 0 {
+			fmt.Printf("%v | %s | %s\n\n", snippets[0].ID	, snippets[0].Lan, snippets[0].Title)
+			highlightedCode, err := helpers.HighlightSyntax(snippets[0].Lan, snippets[0].Code)
+			if err != nil {
+				fmt.Println(err)
+			}
+			fmt.Println(highlightedCode)
+			fmt.Println()
+			return
+		}
+		for _, snippet := range snippets {
+			fmt.Printf("%v | %s | %s\n\n", snippet.ID	, snippet.Lan, snippet.Title)
+			if head {
+				if len(snippet.Code) < 350 {
+					highlightedCode, err := helpers.HighlightSyntax(snippet.Lan, snippet.Code)
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					fmt.Println(highlightedCode, ".......")
+				} else {
+
+					highlightedCode, err := helpers.HighlightSyntax(snippet.Lan, snippet.Code[:350])
+					if err != nil {
+						fmt.Println(err)
+						return
+					}
+					fmt.Println(highlightedCode, ".......")
+					fmt.Println()
+					return
+				}
+			}
+
+		
+	
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// searchCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// searchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	searchCmd.Flags().StringP("lan", "l", "", "Filter snippets by language")
+	searchCmd.Flags().BoolP("head", "y", false, "Display first few characters of code snippet")
 }
+
+

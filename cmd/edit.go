@@ -1,40 +1,73 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
+	"bufio"
+	"bytes"
+	"context"
 	"fmt"
+	"os"
+	"strconv"
 
+	"github.com/karthiknayak6/snipe/database"
+	"github.com/karthiknayak6/snipe/helpers"
 	"github.com/spf13/cobra"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
-// editCmd represents the edit command
 var editCmd = &cobra.Command{
 	Use:   "edit",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Edit a snippet",
+	Long: `Rewrite the code snippet in the database by its ID.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("edit called")
+		id, err := strconv.Atoi(args[0])
+		if err != nil {
+			fmt.Println("Invalid ID format")
+			return
+		}
+		res := database.Db.Collection("snippets").FindOne(context.TODO(), bson.M{"_id": id})
+		if res.Err() != nil{
+			fmt.Println("No snippet found with ID ", id)
+		}
+		var snippet Snippet
+		res.Decode(&snippet)
+		fmt.Printf("%v | %s | %s\n\n", snippet.ID, snippet.Lan, snippet.Title)
+		highlightedCode, err := helpers.HighlightSyntax(snippet.Lan, snippet.Code)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Println(highlightedCode)
+		fmt.Println("Enter your code snippet (press Ctrl+D on a new line to finish):")
+		var codeBuffer bytes.Buffer
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if line == "Ctrl+D" {
+				break
+			}
+			codeBuffer.WriteString(line)
+			codeBuffer.WriteString("\n")
+		}
+
+		if err := scanner.Err(); err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		code := codeBuffer.String()
+		filter := bson.M{"_id": id}
+		update := bson.M{"$set": bson.M{"code": code}}
+		res = database.Db.Collection("snippets").FindOneAndUpdate(context.TODO(), filter, update)
+		if res.Err() != nil {
+			fmt.Println("Error: ", res.Err())
+			return
+		}
+		fmt.Println("Snippet updated successfully")
+		
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(editCmd)
 
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// editCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// editCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

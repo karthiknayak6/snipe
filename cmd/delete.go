@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 
 	"github.com/karthiknayak6/snipe/database"
+	"github.com/karthiknayak6/snipe/helpers"
 	"github.com/spf13/cobra"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -23,39 +26,51 @@ delete <snippet_id>`,
 			return
 		}
 		idStr := args[0]
-		id, err := strconv.Atoi(idStr)
+		id, err := strconv.Atoi(idStr); 
 		if err != nil {
 			fmt.Println("Invalid ID format")
 			return
 		}
-
+		result := database.Db.Collection("snippets").FindOne(context.TODO(), bson.M{"_id": id})
+		if result.Err() != nil {
+			fmt.Println("No Snippet is found with this ID ", id)
+			return
+		}
+		var snippet Snippet
+		result.Decode(&snippet)
+	
+		highlightedCode, err := helpers.HighlightSyntax(snippet.Lan, snippet.Code)
+		if err != nil {
+			fmt.Println(err)
+			return	
+		}
+		fmt.Println(highlightedCode)
+		fmt.Printf("%v | %s | %s	\n\nAre you sure you want to delete this snippet? (y/n) ",snippet.ID, snippet.Lan, snippet.Title)		
+		reader := bufio.NewReader(os.Stdin)
+		text, _ := reader.ReadString('\n')		
+		if text == "n\n" || text == "N\n" {
+			return
+		} else if text != "y\n" && text != "Y\n" {
+			fmt.Println("Invalid input")
+			return		
+		}
 		filter := bson.M{"_id": id}
-		result, err := database.Db.Collection("snippets").DeleteOne(context.TODO(), filter)
+		del, err := database.Db.Collection("snippets").DeleteOne(context.TODO(), filter)
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		if result.DeletedCount == 0 {
+		if del.DeletedCount == 0 {
 			fmt.Println("No document found to delete")
 			return
 		}
 
-		fmt.Println("Successfully deleted the snippet")
+		fmt.Println("\nSuccessfully deleted the snippet")
 	},
 }
 
 
 func init() {
 	rootCmd.AddCommand(deleteCmd)
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// deleteCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// deleteCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

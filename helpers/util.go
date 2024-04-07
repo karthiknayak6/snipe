@@ -1,9 +1,14 @@
 package helpers
 
 import (
+	"bytes"
 	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/alecthomas/chroma/formatters"
+	"github.com/alecthomas/chroma/lexers"
+	"github.com/alecthomas/chroma/styles"
 )
 
 func PrintSupportedLanguages() {
@@ -32,4 +37,33 @@ func PrintSupportedLanguages() {
 				fmt.Printf("%s%s", l, strings.Repeat(" ", numSpaces))
 			}
 			fmt.Println()
+}
+
+
+func HighlightSyntax(lan string, code string) (string, error) {
+	lexer := lexers.Get(lan)
+	if lexer == nil {
+		lexer = lexers.Fallback
+	}
+	iterator, err := lexer.Tokenise(nil, code)
+	if err != nil {
+		return "", err
+	}
+
+	style := styles.Get("monokai")
+	if style == nil {
+		style = styles.Fallback
+	}
+
+	formatter := formatters.Get("terminal16m")
+	if formatter == nil {
+		formatter = formatters.Fallback
+	}
+
+	var highlightedCode bytes.Buffer
+	err = formatter.Format(&highlightedCode, style, iterator)
+	if err != nil {
+		return "", err
+	}
+	return highlightedCode.String(), nil
 }

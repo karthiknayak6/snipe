@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -11,9 +8,6 @@ import (
 	"log"
 	"os"
 
-	"github.com/alecthomas/chroma/formatters"
-	"github.com/alecthomas/chroma/lexers"
-	"github.com/alecthomas/chroma/styles"
 	"github.com/karthiknayak6/snipe/database"
 	"github.com/karthiknayak6/snipe/helpers"
 	"github.com/spf13/cobra"
@@ -26,7 +20,6 @@ import (
 		Code  string             `bson:"code,omitempty"`
 	}
 
-	// addCmd represents the add command
 	var addCmd = &cobra.Command{
 		Use:   "add",
 		Short: "Add a new snippet",	
@@ -35,7 +28,7 @@ import (
 		Run: func(cmd *cobra.Command, args []string) {
 			
 			if len(args) != 2 {
-				fmt.Println("Invalid number of arguments")
+				cmd.Help()
 				return
 			}
 			lan := args[0]
@@ -69,45 +62,27 @@ import (
 			}
 			
 			if err := scanner.Err(); err != nil {
-				log.Panic(err)
+				fmt.Println(err)
+				return
 			}
 			
 			code := codeBuffer.String()
 
-			// Syntax highlighting
-			lexer := lexers.Get(lan)
-			if lexer == nil {
-				lexer = lexers.Fallback
-			}
-			iterator, err := lexer.Tokenise(nil, code)
+		
+
+			fmt.Println("Your Code:")
+			highlightedCode, err := helpers.HighlightSyntax(lan, code)
 			if err != nil {
-				log.Panic(err)
+				panic(err)
 			}
+			fmt.Println(highlightedCode)
 
-			style := styles.Get("monokai")
-			if style == nil {
-				style = styles.Fallback
-			}
 
-			formatter := formatters.Get("terminal16m")
-			if formatter == nil {
-				formatter = formatters.Fallback
-			}
-
-			var highlightedCode bytes.Buffer
-			err = formatter.Format(&highlightedCode, style, iterator)
-			if err != nil {
-				log.Panic(err)
-			}
-
-			fmt.Println("Highlighted Code:")
-			fmt.Println(highlightedCode.String())
 			seq, err := database.GetNextSequence(database.Client, "snippets")
-
-			
 			if err != nil {
 				log.Fatal(err)
 			}
+
 			snippet := Snippet{ID: seq ,Lan: lan, Title: title, Code: code}
 			
 			res, err := database.Db.Collection("snippets").InsertOne(context.TODO(), snippet)
@@ -122,14 +97,4 @@ import (
 
 	func init() {
 		rootCmd.AddCommand(addCmd)
-
-		// Here you will define your flags and configuration settings.
-
-		// Cobra supports Persistent Flags which will work for this command
-		// and all subcommands, e.g.:
-		// addCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-		// Cobra supports local flags which will only run when this command
-		// is called directly, e.g.:
-		// addCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	}

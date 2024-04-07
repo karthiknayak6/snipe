@@ -1,7 +1,3 @@
-/*
-Copyright © 2024 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
@@ -10,21 +6,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
-
-
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "snipe",
-	Short: "A brief description of your application",
-	Long: `A longer description that spans multiple lines and likely contains
-examples and usage of using your application. For example:
+	Use:   "Snipe",
+	Short: "Snipe is a CLI tool for managing code snippets.",
+	Long: `Snipe is a command-line interface (CLI) application designed to help developers 
+manage and organize their code snippets effectively.
 
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+With snippet-manager, you can add, list, search, edit, and delete code snippets with ease.
+It supports multi-line content and provides a flexible way to store and retrieve your valuable code snippets.`,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
@@ -37,14 +27,7 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.snipe.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
+	rootCmd.Root().CompletionOptions.DisableDefaultCmd = true
 	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
